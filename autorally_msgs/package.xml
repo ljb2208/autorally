@@ -16,7 +16,11 @@
 -->
 <package>
   <name>autorally_msgs</name>
+<<<<<<< HEAD
   <version>0.2.3</version>
+=======
+  <version>0.2.4</version>
+>>>>>>> upstream/master
   <description>Custom messages used by autorally</description>
 
   <maintainer email="bgoldfain3@gatech.edu">Brian Goldfain</maintainer>
