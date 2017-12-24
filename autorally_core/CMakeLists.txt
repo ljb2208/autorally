@@ -52,13 +52,9 @@ add_subdirectory(src/xbee)
 add_subdirectory(src/ImageRepublisher)
 add_subdirectory(src/StateEstimator)
 add_subdirectory(src/autorally_chassis)
-<<<<<<< HEAD
-add_subdirectory(src/CameraAutoBalance)
-=======
 add_subdirectory(src/camera_trigger)
 add_subdirectory(src/CameraAutoBalance)
 add_subdirectory(src/WheelOdometry)
->>>>>>> upstream/master
 
 #install(TARGETS
 # 
