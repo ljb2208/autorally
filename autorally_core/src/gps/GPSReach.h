@@ -38,6 +38,7 @@
 #include <autorally_core/Diagnostics.h>
 
 #include <sensor_msgs/NavSatFix.h>
+#include <sensor_msgs/NavSatStatus.h>
 #include <sensor_msgs/TimeReference.h>
 #include <std_msgs/String.h>
 #include <std_msgs/ByteMultiArray.h>
@@ -91,6 +92,8 @@
  *
  */
 
+#define SECONDS_TO_GPS_EPOCH 315964800;
+#define SECONDS_IN_WEEK 604800;
  
 class GPSReach
 {
@@ -132,10 +135,10 @@ class GPSReach
   sensor_msgs::NavSatFix m_navSatFix; ///<Base station position information
   std_msgs::ByteMultiArray m_rtkCorrection; ///<Outgoing RTK correction data
   sensor_msgs::TimeReference m_timeUTC; ///<Base station position information
-  int m_secondsToToday; //used to find UTC time if needed
+  int m_secondsToToday; //used to find UTC time if needed  
+  bool m_bIsBase;
 
-  SerialInterfaceThreaded m_portA; ///<Serial port for status updates
-  SerialInterfaceThreaded m_portB; ///<Serial port to receive RTK corrections
+  SerialInterfaceThreaded m_portA; ///<Serial port for status updates and position correction updates
 
   ros::Time m_previousCovTime;
   double m_accuracyRTK;
@@ -144,6 +147,9 @@ class GPSReach
   double m_gpsTimeOffset;
   std::string m_utcSource;
   std::string m_statusPositionSource;
+
+  time_t m_gpsTime;
+
 
   ros::Time m_mostRecentRTK;
   bool m_rtkEnabled;
@@ -253,7 +259,7 @@ class GPSReach
   * @brief Callback for incoming data on portB
   *
   */
-  void rtcmDataCallback();
+  void publishRTCMData();
 
   /**
   * @brief Callback for correction data received from a base station
@@ -267,7 +273,7 @@ class GPSReach
   * @param msg The full message stripped of leading $ and ending cr lf
   *
   */
-  void processGPSMessage(std::string& msg);
+  //void processGPSMessage(std::string& msg);
 
   void processGPSMessage(int msgId);
   /**
@@ -312,7 +318,7 @@ class GPSReach
   double processAltitude(const std::string& antAlt, const std::string &antAltUnits,
                         const std::string& geodSep, const std::string &geodSepUnits);
 
-    void processGPSTime(uint32_t time, uint16_t week);
+  void processGPSTime(uint32_t millisecs, uint16_t week);
   void processUTC(const std::string& utc, const std::string& source);
   double GetUTC(const std::string& utc);
 };

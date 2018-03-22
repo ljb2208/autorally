@@ -94,9 +94,7 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
 
 
   if(!nh.getParam(nodeName+"/mode", mode) ||
-     !nh.getParam(nodeName+"/primaryPort/portPath", portPathA) ||
-     //!nh.getParam(nodeName+"/correctionPort/portPath", portPathB) ||
-     !nh.getParam(nodeName+"/statusPositionSource", m_statusPositionSource) )
+     !nh.getParam(nodeName+"/primaryPort/portPath", portPathA) )
   {
     ROS_ERROR("GPSReach: could not find mode or portPaths");
   }
@@ -104,6 +102,7 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
     if(mode == "base")
     {
       m_navSatFix.header.frame_id = "gpsBase";
+      m_bIsBase = true;
 
       m_rtkCorrection.layout.data_offset = 0;
       m_rtkCorrection.layout.dim.push_back(std_msgs::MultiArrayDimension());
@@ -126,7 +125,7 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
       m_portA.registerDataCallback(
                       boost::bind(&GPSReach::gpsInfoCallback, this));
       //m_portB.registerDataCallback(
-      //                boost::bind(&GPSReach::rtcmDataCallback, this));
+      //                boost::bind(&GPSReach::publishRTCMData, this));
       
       //  m_refLocTimer = nh.createTimer(ros::Duration(60.0),
 //                    &GPSHemisphere::updateReferenceLocationCallback,
@@ -136,14 +135,14 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
       /*rover gets base location through RTK corrections, updating ref location
        * is not needed
        */
+      m_bIsBase = false;
       m_navSatFix.header.frame_id = "gpsRover";
 
       /* Have to init serial ports after publishers are connected otherwise
        * if a message is received from serial before the associated publisher
        * is connected, an exception occurs and the node crashes.
        */
-      m_portA.init(nh, nodeName, "primaryPort", "Reach", portPathA, true);
-      //m_portB.init(nh, nodeName, "correctionPort", "Reach", portPathB, false);
+      m_portA.init(nh, nodeName, "primaryPort", "Reach", portPathA, true);      
       
       m_statusPub = nh.advertise<sensor_msgs::NavSatFix>("gpsRoverStatus", 5);
 
@@ -283,9 +282,14 @@ void GPSReach::gpsInfoCallback()
   m_portA.unlock();
 }
 
-void GPSReach::processGPSTime(uint32_t time, uint16_t week)
+void GPSReach::processGPSTime(uint32_t millisecs, uint16_t week)
 {
+  m_gpsTime = SECONDS_TO_GPS_EPOCH;
+  m_gpsTime += week * SECONDS_IN_WEEK
+  m_gpsTime += millisecs / 1000;
 
+  ROS_WARN_STREAM("GPS Time Raw: " << millisecs << " week: " << week);
+  ROS_WARN_STREAM("GPS Time " << asctime(gmtime(&m_gpsTime)));
 }
 
 void GPSReach::processGPSMessage(int msgId)
@@ -313,6 +317,7 @@ void GPSReach::processGPSMessage(int msgId)
       m_navSatFix.latitude = _buffer.pos.latitude;
       m_navSatFix.longitude = _buffer.pos.longitude;
       m_navSatFix.altitude = _buffer.pos.altitude_msl;
+
       //m_navSatFix.header.stamp = ros::Time(((double)((int)(ros::Time::now().toSec() + m_gpsTimeOffset) / 86400) * 86400) + messageTime + m_gpsTimeOffset);
   }
   else if (msgId == MSG_DOPS)
@@ -321,530 +326,38 @@ void GPSReach::processGPSMessage(int msgId)
   }
   else if (msgId == MSG_STAT)
   {
-    processGPSTime(_buffer.pos.time, _buffer.pos.week);
-  }
-/*
-  if(msgType == "GPGGA")
-  {
-    if(tokens.size() < 15)
+    //m_portA.diag("GPS Status: Fix Type", _Buffer.stat.fix_type);
+    switch(_buffer.stat.fix_type)
     {
-      ROS_WARN("GPSReach: %s wrong token count %lu", msgType.c_str(), tokens.size());
-      return;
-    }
-    m_portA.tick(msgType);
-
-    if(msgType != m_statusPositionSource)
-    {
-      ROS_WARN("GPSReach: using %s for fix data, ignoring %s",
-               m_statusPositionSource.c_str(),
-               msgType.c_str()); 
-      return;
+      case 0: // no fix
+        m_navSatFix.status.status = sensor_msgs::NavSatStatus::STATUS_NO_FIX;
+        break;
+      case 1: // Single        
+      case 2: // Float        
+      case 3: // RTK Fix
+        m_navSatFix.status.status = sensor_msgs::NavSatStatus::STATUS_FIX;
+        break;
+      default:
+        m_navSatFix.status.status = sensor_msgs::NavSatStatus::STATUS_NO_FIX;
+        break;
     }
 
-    if( atoi(tokens[1].c_str()) == 0)
-    {
-      m_navSatFix.latitude = 0.0;
-      m_navSatFix.longitude = 0.0;
-      m_navSatFix.altitude = 0.0;
-      m_navSatFix.header.stamp = ros::Time::now();
-      m_portA.diag(msgType + " UTC HHMMSS.SS:", "-");
-      m_portA.diag(msgType + " quality:", processQuality("0"));
-      m_portA.diag(msgType + " # of satellites:", "0");
-      m_portA.diag(msgType + " HDOP:", "-");
-      m_portA.diag(msgType + " diff correction age (s):", "-");
-      m_portA.diag(msgType + " diff ref station ID:", "-");
-    } else
-    {;
-      processUTC(tokens[1], msgType);
-      m_portA.diag(msgType + " UTC HHMMSS.SS:", tokens[1].c_str());
-      m_navSatFix.latitude = processLatitude(tokens[2],tokens[3]);
-      m_navSatFix.longitude = processLongitude(tokens[4],tokens[5]);
-      m_portA.diag(msgType + " quality:", processQuality(tokens[6]));
-      m_portA.diag(msgType + " # of satellites:", tokens[7].c_str());
-      m_portA.diag(msgType + " HDOP:", tokens[8].c_str());
-      
-      m_navSatFix.altitude = processAltitude(tokens[9], tokens[10], tokens[11], tokens[12]);
-      if(fabs(m_navSatFix.altitude) < 0.001 || fabs(m_navSatFix.latitude) < 0.001 || fabs(m_navSatFix.longitude) < 0.001)
-      {
-        return;
-      }
-      
-      //quality token
-      if(tokens[6] != "0" && tokens[6] != "1")
-      {
-        if(tokens.size() < 15)
-        {
-          ROS_WARN("GPSReach: wrong token count 3 in: %s", msg.c_str());
-          return;
-        }
-        m_portA.diag(msgType + " diff correction age (s):", tokens[13].c_str());
-        m_portA.diag(msgType + " diff ref station ID:", tokens[14].c_str());
-      } else
-      {
-        m_portA.diag(msgType + " diff correction age (s):", "-");
-        m_portA.diag(msgType +  " diff ref station ID:", "-");
-      }
-      double messageTime = GetUTC(tokens[1]);
-      m_navSatFix.header.stamp = ros::Time(((double)((int)(ros::Time::now().toSec() + m_gpsTimeOffset) / 86400) * 86400) + messageTime + m_gpsTimeOffset);
-      //std::cout << (double)((int)(ros::Time::now().toSec() + m_gpsTimeOffset) / 86400) << "Week" << messageTime << time << std::endl;
-      //std::cout << (ros::Time::now().toSec()) << std::endl;
-    }
-    double messageAge = m_navSatFix.header.stamp.toSec() - ros::Time::now().toSec();
-    // Abandon our timestamp if its too far off
-    if (messageAge > 1.0 || messageAge < -1.0){
-      m_navSatFix.header.stamp = ros::Time::now();
-      ROS_ERROR("GPS message too old! %f seconds", messageAge);
-    }
-    
-    try
-    {
-      m_portA.diag("GPS Message Age (s)", (boost::lexical_cast<std::string>(messageAge)).c_str());
-    } catch(const boost::bad_lexical_cast &)
-    {
-      ROS_ERROR_STREAM("GPSReach failed GPS message age lexical cast");
-      m_portB.diag_warn("GPSReach failed GPS message age lexical cast");
-      return;
-    }
+    processGPSTime(_buffer.stat.time, _buffer.stat.week);
+    m_navSatFix.header.stamp == ros::Time(m_gpsTime);
 
     m_statusPub.publish(m_navSatFix);
-    m_portA.tick("Publishing navSatFix");
-  } else if(msgType == "GPGNS")
-  {
-    if(tokens.size() < 15)
-    {
-      ROS_WARN("GPSReach: %s wrong token count %lu", msgType.c_str(), tokens.size());
-      return;
-    }
-    m_portA.tick(msgType);
-
-    if(msgType != m_statusPositionSource)
-    {
-      ROS_WARN("GPSReach: using %s for fix data, ignoring %s",
-               m_statusPositionSource.c_str(),
-               msgType.c_str()); 
-      return;
-    }
-
-    if( atoi(tokens[1].c_str()) == 0)
-    {
-      m_navSatFix.latitude = 0.0;
-      m_navSatFix.longitude = 0.0;
-      m_navSatFix.altitude = 0.0;
-      m_navSatFix.header.stamp = ros::Time::now();
-      m_portA.diag(msgType + " UTC HHMMSS.SS:", "-");
-      m_portA.diag(msgType + " GPS mode indicator:", "no fix");
-      m_portA.diag(msgType + " GLONASS mode indicator:", "no fix");
-      m_portA.diag(msgType + " # of satellites:", "0");
-      m_portA.diag(msgType + " HDOP:", "-");
-      m_portA.diag(msgType + " diff correction age (s):", "-");
-      m_portA.diag(msgType + " diff ref station ID:", "-");
-      m_portA.ERROR();
-      //navigational status should be unsafe when no fix
-      if(tokens[13] == "U")
-      {
-        m_portA.diag(msgType + " Navigational status:", "U - unsafe");
-      } else
-      {
-        m_portA.diag(msgType + "Unknown no fix navigational status:", tokens[13]);
-      }
-    } else
-    {
-      processUTC(tokens[1], msgType);
-      m_portA.diag(msgType + " UTC HHMMSS.SS:", tokens[1].c_str());
-      m_navSatFix.latitude = processLatitude(tokens[2],tokens[3]);
-      m_navSatFix.longitude = processLongitude(tokens[4],tokens[5]);
-      
-      if(tokens[6].size() >= 1)
-      {
-        m_portA.diag(msgType + " GPS mode indicator:", processMode(tokens[6].substr(0,1)));
-      }
-      if(tokens[6].size() == 2)
-      {
-        m_portA.diag(msgType + " GLONASS mode indicator:", processMode(tokens[6].substr(1,1)));
-      }
-
-      m_portA.diag(msgType + " # of satellites:", tokens[7].c_str());
-      m_portA.diag(msgType + " HDOP:", tokens[8].c_str());
-      
-      try
-      {
-        m_navSatFix.altitude = boost::lexical_cast<double>(tokens[9]) +
-                               boost::lexical_cast<double>(tokens[10]);
-      } catch(const boost::bad_lexical_cast &)
-      {
-        m_portA.diag_error("GPSReach::GPGNS bad altitude lexical cast");
-        ROS_ERROR("GPSReach::GPGNS bad altitude lexical cast");
-        return;
-      } 
-      
-      if((tokens[6][0] == 'D' ||
-          tokens[6][0] == 'P' ||
-          tokens[6][0] == 'R' ||
-          tokens[6][0] == 'F' || 
-          tokens[6][1] == 'D' ||
-          tokens[6][1] == 'P' ||
-          tokens[6][1] == 'R' ||
-          tokens[6][1] == 'F') )
-      {
-        m_portA.diag(msgType + " diff correction age (s):", tokens[11].c_str());
-        m_portA.diag(msgType + " diff ref station ID:", tokens[12].c_str());
-      }else
-      {
-        m_portA.diag(msgType + " diff correction age (s):", "-");
-        m_portA.diag(msgType +  " diff ref station ID:", "-");
-      }
-
-      if(tokens[13] == "S")
-      {
-        m_portA.diag(msgType + " Navigational status:", "S - safe");
-      } else if(tokens[13] == "C")
-      {
-        m_portA.diag(msgType + " Navigational status:", "C - caution");
-      } else if(tokens[13] == "U")
-      {
-        m_portA.diag(msgType + " Navigational status:", "U - unsafe");
-      } else if(tokens[13] == "V")
-      {
-        m_portA.diag(msgType + " Navigational status:", "V - not valid");
-      } else
-      {
-        m_portA.diag(msgType + "Unknown Navigational status:", tokens[13]);
-      }
-
-      double messageTime = GetUTC(tokens[1]);
-      m_navSatFix.header.stamp = ros::Time(((double)((int)(ros::Time::now().toSec() + m_gpsTimeOffset) / 86400) * 86400) + messageTime + m_gpsTimeOffset);
-      //std::cout << (double)((int)(ros::Time::now().toSec() + m_gpsTimeOffset) / 86400) << "Week" << messageTime << time << std::endl;
-      //std::cout << (ros::Time::now().toSec()) << std::endl;
-    }
-    double messageAge = m_navSatFix.header.stamp.toSec() - ros::Time::now().toSec();
-    // Abandon our timestamp if its too far off
-    if (messageAge > 1.0 || messageAge < -1.0)
-    {
-      m_navSatFix.header.stamp = ros::Time::now();
-      ROS_ERROR("GPS message too old! %f seconds", messageAge);
-    }
-    
-    try
-    {
-      m_portA.diag("GPS Message Age (s)", (boost::lexical_cast<std::string>(messageAge)).c_str());
-    } catch(const boost::bad_lexical_cast &)
-    {
-      ROS_ERROR_STREAM("GPSReach failed GPS message age lexical cast");
-      m_portB.diag_warn("GPSReach failed GPS message age lexical cast");
-      return;
-    }
-
-    m_statusPub.publish(m_navSatFix);
-    m_portA.tick("Publishing navSatFix");
-  } else if(msgType == ">JRTK")
-  {
-    if(tokens.size() < 2)
-    {
-      ROS_WARN("GPSReach: wrong token count 4 in: %s", msg.c_str());
-      return;
-    }
-    if(tokens[1] == "6")
-    {
-      if(tokens.size() < 5)
-      {
-        ROS_WARN("GPSReach: wrong token count 5 in: %s", msg.c_str());
-        return;
-      }
-      std::string timeToGo = tokens[2];
-      int readyTransmit = atoi(tokens[3].c_str());
-      int transmitting = atoi(tokens[4].c_str());
-
-      if(transmitting > 0)
-      {
-        m_portB.diag("RTK Corrections:", "transmitting");
-        m_portB.diag("RTK Fix:", "SBAS");
-        m_portB.OK();
-      } else if(readyTransmit > 0)
-      {
-        m_portB.diag("RTK Corrections:", "ready to transmit");
-        m_portB.diag("RTK Fix:", "SBAS");
-        m_portB.OK();
-      } else
-      {
-        m_portB.diag("RTK Corrections:", timeToGo + " seconds until ready");
-        if(atoi(timeToGo.c_str()) == 299)
-        {
-          m_portB.diag("RTK Fix:", "none");
-          m_portB.ERROR();
-        } else
-        {
-          m_portB.diag("RTK Fix:", "unaugmented");
-          m_portB.WARN();
-        }
-      }
-    } else if(tokens[1] == "1")
-    {
-      //ignore since its a reply
-    }
   }
-  else if(msgType == "GPGSA" ||
-          msgType == "GLGSA" ||
-          msgType == "GNGSA")
+  else if (msgId == MSG_RTK)
   {
-    if(tokens.size() < 20)
-    {
-      ROS_WARN("GPSReach: %s too few tokens %lu", msgType.c_str(), tokens.size());
-      return;
-    }
-    std::string gnssId;
-    if(tokens[18] == "1")
-    {
-      gnssId = " GPS";
-    } else if(tokens[18] == "2")
-    {
-      gnssId = " GLONASS";
-    } else
-    {
-      gnssId = " unknown gnssId: " + tokens[18];
-    }
-    m_portA.tick(msgType + gnssId);
-
-    if( (ros::Time::now()-m_previousCovTime).toSec() > 5.0)
-    {
-        m_navSatFix.position_covariance_type =
-              sensor_msgs::NavSatFix::COVARIANCE_TYPE_UNKNOWN;
-    }
-
-    //only use this if there isn't a better source of covariance information
-    //and the fix is valid
-    int satsInUse = 0;
-    std::string sats;
-    for(int i = 3; i < 15; i++)
-    {
-      if(!tokens[i].empty())
-      {
-        ++satsInUse;
-        sats += tokens[i];
-        sats += " ";
-      }
-    }
-    m_portA.diag(msgType + gnssId + " # satellites used:", std::to_string(satsInUse));
-    if(satsInUse > 0)
-    {
-      m_portA.diag(msgType + gnssId + " satellites used:", sats);
-    }
-    m_portA.diag(msgType + gnssId + " PDOP-HDOP-VDOP", 
-                 tokens[15]+"-"+tokens[16]+"-"+tokens[17]);
-
-    if(m_navSatFix.position_covariance_type <=
-       sensor_msgs::NavSatFix::COVARIANCE_TYPE_APPROXIMATED &&
-       atof(tokens[2].c_str()) > 1)
-    { 
-      //choose ideal measurmenet error based on fix type
-      double multiplier = m_accuracyRTK;
-      if(m_navSatFix.status.status <= sensor_msgs::NavSatStatus::STATUS_FIX)
-      {
-        multiplier = m_accuracyAutonomous;
-      } else if(m_navSatFix.status.status <= sensor_msgs::NavSatStatus::STATUS_SBAS_FIX)
-      {
-        multiplier = m_accuracyWAAS;
-      }
-
-      //use DOP*ideal measurement error for std dev estimates
-      //HDOP used for lat and lon
-
-      try
-      {
-        double val = boost::lexical_cast<double>(tokens[4])*multiplier;
-        m_navSatFix.position_covariance[0] = val*val;
-        m_navSatFix.position_covariance[4] = val*val;
-        //VDOP
-        //val = boost::lexical_cast<double>(tokens[5])*multiplier;
-        val = boost::lexical_cast<double>(tokens[5])*multiplier;
-        m_navSatFix.position_covariance[8] = val*val;
-
-        m_navSatFix.position_covariance_type =
-                  sensor_msgs::NavSatFix::COVARIANCE_TYPE_APPROXIMATED;
-        m_previousCovTime = ros::Time::now();
-      } catch(const boost::bad_lexical_cast &)
-      {
-        m_portA.diag_error("GPSReach: process of GSA msg cause bad lexical cast for:"
-                           + msgType);
-        ROS_ERROR_STREAM("GPSReach::process " << msgType << " caused bad lexical cast failed");
-        return;
-      }
-    }
-
-  }  else if(msgType == "GPGST")
-  {
-    if(tokens.size() < 9)
-    {
-      ROS_WARN("GPSReach: GPGST partial token count: %lu", tokens.size());
-      return;
-    }
-
-    m_portA.tick("GPGST");
-
-    if( (ros::Time::now()-m_previousCovTime).toSec() > 5.0)
-    {
-        m_navSatFix.position_covariance_type =
-              sensor_msgs::NavSatFix::COVARIANCE_TYPE_UNKNOWN;
-    }
-
-    //check to see better variance source is available, and the message has data
-    if(m_navSatFix.position_covariance_type <=
-       sensor_msgs::NavSatFix::COVARIANCE_TYPE_DIAGONAL_KNOWN &&
-       atof(tokens[1].c_str()) > 100)
-    {
-      if(tokens.size() < 9)
-      {
-        ROS_WARN("GPSReach: wrong token count 7 in: %s", msg.c_str());
-        return;
-      }
-      //UTC time
-      processUTC(tokens[1], msgType);
-      //Token 2 = RMS of std dev of range inputs
-      //Token 3 = Standard deviation of semi-major axis of error ellipse, meters
-      //Token 4 = Standard deviation of semi-minor axis of error ellipse, meters
-      //Token 5 = Error in semi major axis origination, in decimal degrees, true north
-
-
-      //Std dev of latitude error, in meters
-      try
-      {
-        if(!tokens[6].empty())
-        {
-          double val = boost::lexical_cast<double>(tokens[6]);
-          m_navSatFix.position_covariance[0] = val*val;
-          //Std dev of longitude error, in meters
-          val = boost::lexical_cast<double>(tokens[7]);
-          m_navSatFix.position_covariance[4] = val*val;
-          //Std dev of altitude error, in meters
-          val = boost::lexical_cast<double>(tokens[8]);
-          m_navSatFix.position_covariance[8] = val*val;
-
-          m_navSatFix.position_covariance_type =
-                  sensor_msgs::NavSatFix::COVARIANCE_TYPE_DIAGONAL_KNOWN;
-          m_previousCovTime = ros::Time::now();
-        }
-      } catch(const boost::bad_lexical_cast &)
-      {
-        m_portA.diag_error("GPSReach: process GPGST bad lexical cast");
-        ROS_ERROR("GPSReach: process GPGST bad lexical cast");
-        return;
-      }
-    }
-  } else if(msgType == "GPVTG") //course over ground/ground speed
-  {
-    m_portA.tick("GPVTG");
-  }  else if(msgType == "GPZDA") //detailed UTC time information
-  {
-    if(tokens.size() < 2)
-    {
-      ROS_WARN("GPSReach: wrong token count 8 in: %s", msg.c_str());
-      return;
-    }
-    m_portA.tick("GPZDA");
-    processUTC(tokens[1], "GPZDA");
-    //Token 1 = UTC
-    //Token 2 = UTC day
-    //Token 3 = UTC month
-    //Token 4 = UTC year
-    //Token 5 = Local zone hours
-    //Token 6 = Local zone minutes
-  } else if(msgType == "PSAT")
-  {
-    if(tokens.size() < 2)
-    {
-      ROS_WARN("GPSReach: wrong token count 9 in: %s", msg.c_str());
-      return;
-    }
-    m_portA.tick("PSAT");
-    if(tokens[1] == "RTKSTAT")
-    {
-    } else if(tokens[1] == "RTKPROG")
-    {
-    }
-  } else if(msgType == "GPGSV" ||
-            msgType == "GLGSV")
-  {
-    if(tokens.size() < 5) //Minimum message with no satelite info in it.
-    {
-      ROS_WARN("GPSReach: wrong token count 10 in: %s", msg.c_str());
-      return;
-    }
-    
-    try
-    {
-      int totalMessages = boost::lexical_cast<int>(tokens[1]);
-      int messageNumber = boost::lexical_cast<int>(tokens[2]);
-
-      if(m_showGsv)
-      {
-        char channel[20];
-        // Iterate through all of the satellites
-        for (size_t i = 4; i <= (tokens.size() - 6); i+=4)
-        {
-          std::string diagnosticMessage;
-          diagnosticMessage += " SS: ";
-          diagnosticMessage += tokens[i+3];
-          if (tokens[i+3]=="") diagnosticMessage += "NA";
-          diagnosticMessage += " EL: ";
-          diagnosticMessage += tokens[i+1];
-          diagnosticMessage += " AZ: ";
-          diagnosticMessage += tokens[i+2];
-          diagnosticMessage += " Num: ";
-          diagnosticMessage += tokens[i];
-          std::string diagnosticLabel = msgType;
-          diagnosticLabel += " channel ";
-          snprintf(channel,20,"%lu",(messageNumber*4) + ((i-4)/4));
-          diagnosticLabel += std::string(channel);
-          m_portA.diag(diagnosticLabel,diagnosticMessage);
-        }
-      }
-
-      if(messageNumber == totalMessages)
-      {
-        //We got complete info
-        m_portA.tick(msgType);
-      }
-    } catch(const boost::bad_lexical_cast &)
-    {
-      m_portA.diag_error("GPSReach: process GSV failed");
-      ROS_ERROR_STREAM("GPSReach: process " << msgType << " failed");
-      return;
-    }
-
-  } else if(msgType == "GPGNS" ||
-            msgType == "GLGNS"  ||
-            msgType == "GNGNS")
-  {
-    m_portA.tick(msgType);
-  }else
-  {
-    ROS_WARN("GPSReach: received unknown message type:%s", msgType.c_str());
+    ROS_WARN("Process RTK");
+    publishRTCMData();
   }
-  */
 }
 
-void GPSReach::rtcmDataCallback()
-{
-  m_portB.lock();
-
-  if(m_portB.m_data.size() > 6)
-  {
-    //make sure data is framed
-    if((m_portB.m_data[0]&0xff) != 0xd3)
-    {
-      std::string s;
-      s.push_back(0xd3);
-      s.push_back(0x00);
-      size_t start = m_portB.m_data.find(s);
-      //ROS_WARN_STREAM("Not Framed");
-      //std::cout << "Discarding:" << m_portB.m_data.substr(0, start).size() <<
-      //  " Leading with:" << (unsigned int)(m_portB.m_data[0]&0xff) << std::endl;
-      //printMessage(m_portB.m_data);
-      m_portB.m_data.erase(0, start);
-    }
-
-    //process if there is enough data to read the header and message type
-    if(m_portB.m_data.length() > 6)
-    {
+void GPSReach::publishRTCMData()
+{  
+  if(!m_bIsBase)
+    return;
       /*RTCM 3.0 frame structure:
                   bits 0 - 7 - header
                   bits 8 - 13 - reserved
@@ -855,69 +368,42 @@ void GPSReach::rtcmDataCallback()
                   first 6 bits of message body are message type,
                   total frame size (bytes): message length + 6
       */
-      unsigned int len = (unsigned int)((((unsigned int)m_portB.m_data[1])&0x03)>>8) +
-                         (unsigned int)(((m_portB.m_data[2])&0xff)) + 6;
-      unsigned int type = (unsigned int)(((m_portB.m_data[3])&0xff)<<4) +
-                          (unsigned int)(((m_portB.m_data[4])&0xf0)>>4);
+  unsigned int len = sizeof(_buffer);
+  
+  ROS_WARN_STREAM("RTCM len " << len);
+  try
+  {                   
+    //fill in structure to send message
+    ROS_WARN_STREAM("RTCM struct");
+    m_rtkCorrection.layout.dim.front().label = "RTCM3.0";      
+    m_rtkCorrection.layout.dim.front().size = len;
+    m_rtkCorrection.layout.dim.front().stride = 1*(len);
+    m_rtkCorrection.data.resize(len);
+    ROS_WARN_STREAM("RTCM buffer copy start");
+    memcpy(&m_rtkCorrection.data[0], &_buffer, len);
 
-      /*printf("%x %x %x %x %x\n", m_portB.m_data[0]&0xff,
-                                 m_portB.m_data[1]&0xff,
-                                 m_portB.m_data[2]&0xff,
-                                 m_portB.m_data[3]&0xff,
-                                 m_portB.m_data[4]&0xff);*/
-
-      if(m_portB.m_data.size() >= len && ((type > 1000 && type < 1030) || (type > 4087 && type <= 4096)))
-      {
-        //printMessage(m_portB.m_data);
-        //ROS_WARN_STREAM("Buffer len:" << m_portB.m_data.length() <<
-        //                " Payload len:" << len << " msg type:" << type);
-        //record type of message seen in diagnostics
-        try
-        {
-          m_portB.tick("RTCM3.0 type "+boost::lexical_cast<std::string>(type));
-         
-          //fill in structure to send message
-          m_rtkCorrection.layout.dim.front().label = "RTCM3.0 " +
-                          boost::lexical_cast<std::string>(type);
-      
-          m_rtkCorrection.layout.dim.front().size = len;
-          m_rtkCorrection.layout.dim.front().stride = 1*(len);
-          m_rtkCorrection.data.resize(len);
-          memcpy(&m_rtkCorrection.data[0], &m_portB.m_data[0], len);
-
-          m_rtcm3Pub.publish(m_rtkCorrection);
-        } catch(const boost::bad_lexical_cast &)
-        {
-          ROS_ERROR_STREAM("GPSReach failed RTCM3.0 type lexical cast:" << type);
-          m_portB.diag_warn("GPSReach failed RTCM3.0 type lexical cast");
-          return;
-        }
-        
-        m_portB.m_data.erase(0,len);
-        //std::cout << "\t new B Len:" << m_portB.m_data.length() << std::endl;
-      } else if(m_portB.m_data.size() >= len)
-      {
-        m_portB.m_data.erase(0,len);
-        ROS_WARN_STREAM("GPSReach:: unknown RTCM3.0 message type:" << type << " of length:" << len);
-        m_portB.diag_warn("GPSReach:: unknown " + m_rtkCorrection.layout.dim.front().label);
-      }
-
-    }
-  }
-
-  m_portB.unlock();
-
+    ROS_WARN_STREAM("RTCM buffer copy complete");
+    m_rtcm3Pub.publish(m_rtkCorrection);
+  } catch(const boost::bad_lexical_cast &)
+  {
+    ROS_ERROR_STREAM("GPSReach failed RTCM3.0 type lexical cast:");
+    m_portA.diag_warn("GPSReach failed RTCM3.0 type lexical cast");
+    return;
+  }                  
 }
 
 void GPSReach::rtcmCorrectionCallback(const std_msgs::ByteMultiArray& msg)
 {
-  m_portB.tick("Incoming Correction Data");
+  ROS_WARN("write RTCM3 correction data");
+  m_portA.lock();
+  m_portA.tick("Incoming Correction Data");
   m_mostRecentRTK = ros::Time::now();
-  m_portB.writePort( reinterpret_cast<const unsigned char*>(&msg.data[0]),
+  m_portA.writePort( reinterpret_cast<const unsigned char*>(&msg.data[0]),
                      msg.layout.dim[0].size);
+  m_portA.unlock();
 }
 
-void GPSReach::processGPSMessage(std::string& msg)
+/* void GPSReach::processGPSMessage(std::string& msg)
 {
   if(msg.length() == 0)
   {
@@ -1007,7 +493,7 @@ void GPSReach::processGPSMessage(std::string& msg)
     } catch(const boost::bad_lexical_cast &)
     {
       ROS_ERROR_STREAM("GPSReach failed GPS message age lexical cast");
-      m_portB.diag_warn("GPSReach failed GPS message age lexical cast");
+      m_portA.diag_warn("GPSReach failed GPS message age lexical cast");
       return;
     }
 
@@ -1135,7 +621,7 @@ void GPSReach::processGPSMessage(std::string& msg)
     } catch(const boost::bad_lexical_cast &)
     {
       ROS_ERROR_STREAM("GPSReach failed GPS message age lexical cast");
-      m_portB.diag_warn("GPSReach failed GPS message age lexical cast");
+      m_portA.diag_warn("GPSReach failed GPS message age lexical cast");
       return;
     }
 
@@ -1161,8 +647,8 @@ void GPSReach::processGPSMessage(std::string& msg)
 
       if(transmitting > 0)
       {
-        m_portB.diag("RTK Corrections:", "transmitting");
-        m_portB.diag("RTK Fix:", "SBAS");
+        m_portA.diag("RTK Corrections:", "transmitting");
+        m_portA.diag("RTK Fix:", "SBAS");
         m_portB.OK();
       } else if(readyTransmit > 0)
       {
@@ -1425,7 +911,7 @@ void GPSReach::processGPSMessage(std::string& msg)
     ROS_WARN("GPSReach: received unknown message type:%s", msgType.c_str());
   }
 
-}
+} */
 
 std::string GPSReach::processQuality(const std::string& qual)
 {
