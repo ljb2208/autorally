@@ -1,0 +1,15 @@
+create file /etc/udev/rules.d/99-usb-serial.rules
+
+insert below
+
+
+run sudo udevadm trigger
+
+
+
+SUBSYSTEM=="tty", ATTRS{idVendor}=="8087", ATTRS{idProduct}=="0a9e", ATTRS{serial}=="2fd34c48f135b02e6b6cc6cc496d13f1", SYMLINK+="ttyGPSBASE"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="8087", ATTRS{idProduct}=="0a9e", ATTRS{serial}=="e89f75de17d5458c86293aa3febcaf09", SYMLINK+="ttyGPSROVER"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="8087", ATTRS{idProduct}=="0a9e", SYMLINK+="ttyGPS"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="8087", ATTRS{idProduct}=="0a9e", SYMLINK+="arArduino"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", SYMLINK+="arXbeeNode"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2a03", ATTRS{idProduct}=="003d", SYMLINK+="arChassis"
