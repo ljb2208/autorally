@@ -17,7 +17,7 @@ Research Pages AutoRally is associated with:
 
 We welcome bug fixes, ehancements, new features, and [feedback](https://github.com/AutoRally/autorally/issues)!
 
-Please submit pull requests to the [devel branch](https://github.com/AutoRally/autorally/pull/new/devel) that conform to the [ROS C++ Style Guide](http://wiki.ros.org/CppStyleGuide). We use Gitflow, so master branch is reserved for releases.
+Please submit pull requests to the [kinetic-devel branch](https://github.com/AutoRally/autorally/pull/new/kinetic-devel) that conform to the [ROS C++ Style Guide](http://wiki.ros.org/CppStyleGuide). We use Gitflow, so master branch is reserved for releases.
 
 ## Setup Instructions
 
@@ -28,22 +28,20 @@ Please submit pull requests to the [devel branch](https://github.com/AutoRally/a
 4. [Compilation/Running](#4-compilation-running)
 5. [Generate Documentation](#5-generate-documentation)
 6. [Test Setup in Simulation](#6-test-setup-in-simulation)
+7. [Autonomous Driving in Simulation](#7-autonomous-driving-in-simulation)
 
 ### 1. Install Prerequisites
-1. __Install [Ubuntu 14.04 64-bit](http://www.ubuntu.com)__
+1. __Install [Ubuntu 16.04 64-bit](http://www.ubuntu.com)__
 2. __Install required packages__
 
    ```sudo apt-get install git doxygen openssh-server libusb-dev texinfo```
-   
+
    _Recommended Tools_
-   
-   The following tools are useful, but not necessary for this project.
-   * feh
+
+   The following tools are useful, but not required for this project.
    * cutecom
    * cmake-curses-gui
-   * coriander
    * synaptic
-   * arduino
    * python-termcolor
 
 3. __Install MPPI Dependencies (only if you have a GPU and will run MPPI)__
@@ -53,10 +51,25 @@ Please submit pull requests to the [devel branch](https://github.com/AutoRally/a
     * [Install CUDA](https://developer.nvidia.com/cuda-downloads)
     * [Install CNPY](https://github.com/rogersce/cnpy)
    
+<<<<<<< HEAD
 4. __[Install](http://www.ros.org/install/) ros-indigo-desktop-full__
+=======
+   ```sudo apt-get install cutecom cmake-curses-gui synaptic python-termcolor```
+
+3. __[Install](http://www.ros.org/install/) ros-kinetic-desktop-full__
+
+4. __Install MPPI Dependencies (if you have a GPU and will run MPPI)__
+
+    The core idea behind MPPI is to sample thousands of trajectories really fast. This is accomplished by implementing the sampling step on a GPU, for which you will need CUDA. We also use an external library to load python's numpy zip archives (.npz files) into C++.
+
+    * [Install CUDA](https://developer.nvidia.com/cuda-downloads)
+    * [Install CNPY](https://github.com/rogersce/cnpy)
+
+>>>>>>> upstream/kinetic-devel
 5. __Install gtsam__
 
-   Follow the gtsam [Quick Start](https://bitbucket.org/gtborg/gtsam/) guide to clone and install the _develop_ branch of gtsam. 
+
+   Follow the gtsam [Quick Start](https://bitbucket.org/gtborg/gtsam/) guide to clone and install the _develop_ branch of gtsam.
 
    Instead of `cmake ..`, use:
 
@@ -65,7 +78,7 @@ Please submit pull requests to the [devel branch](https://github.com/AutoRally/a
    Once install is complete, make sure linux can see the shared library:
 
    ```sudo ldconfig```
-   
+
 ### 2. Clone or Fork Repositories
 
 Get the autorally repository in a [catkin workspace](http://wiki.ros.org/catkin/workspaces). The suggested location is `~/catkin_ws/src/`, but any valid catkin worskspace source folder will work. We suggest forking first if you will be working with the code.
@@ -78,7 +91,10 @@ To clone straight from the AutoRally repo:
 Also clone the IMU code into the same catkin workspace:
 
     git clone https://github.com/AutoRally/imu_3dm_gx4.git
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/kinetic-devel
 
 ### 3. Install AutoRally ROS Dependencies
 
@@ -114,7 +130,7 @@ Verify runstop motion is enabled by looking at the `runstopMotionEnabled` paramt
 
 If you aren't using a gamepad, you will have to configure another source of runstop information for the platform to move:
 
-- Comment out line 93 of `autorally_gazebo/launch/autoRallyTrackGazeboSim.launch`
+- Comment out line 89 of `autorally_gazebo/launch/autoRallyTrackGazeboSim.launch`
 
 - ```rosrun rqt_publisher rqt_publisher```
 
@@ -127,13 +143,6 @@ and configure rqt_publisher to publish a message to topic `/runstop` of type `au
 At the end of this section the robot will be driving autonomously in simulation using controllers available in `autorally_control`.
 
 Position the robot in the same spot as when the simulation starts and make sure runstop motion should is enabled (set to **true**).
-
-#### Start state estimator:
-
-In `autorally_core/launch/state_estimator.launch` change `InvertY` and `InvertZ` to **false**, then:
-    
-    rosparam set /gps_imu/FixedInitialPose true
-    roslaunch autorally_core state_estimator.launch
 
 #### Start waypoint follower:
 
@@ -157,5 +166,7 @@ More detailed explanations of the controllers and state estimator can be found o
 * [MPPI Controller](https://github.com/AutoRally/autorally/wiki/Model-Predictive-Path-Integral-Controller-(MPPI))
 
 [Controlling the AutoRally platform](https://github.com/AutoRally/autorally/wiki/Controlling%20the%20AutoRally%20Platform) is a tutorial for how your own controller can control the AutoRally platform (in simulation or on hardware).
+
+[Multiple AutoRally Platforms In Simulation](https://github.com/AutoRally/autorally/wiki/Running-Multiple-Vehicles-In-Simulation-(Gazebo)) is a tutorial on how to launch and control 2 or more platforms in simulation.
 
 If you are configuring a physical AutoRally platform, the next step is to configure the compute box, all of the peripherals, and the launch system. Those instructions are found in the [Platform Configuration Instructions](https://github.com/AutoRally/autorally/wiki/Platform%20Configuration%20Instructions).
