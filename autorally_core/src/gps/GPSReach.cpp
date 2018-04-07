@@ -255,7 +255,7 @@ void GPSReach::gpsInfoCallback()
         _step++;
         if (_ck_a != data)
         {
-          ROS_WARN_STREAM("GPSReach:: Invalid Checksum");
+          ROS_DEBUG_STREAM("GPSReach:: Invalid Checksum");
         }
         continue;
       }
@@ -269,12 +269,12 @@ void GPSReach::gpsInfoCallback()
 
         if (_ck_b != data)
         {
-          ROS_WARN_STREAM("GPSReach:: Invalid Checksum");
+          ROS_DEBUG_STREAM("GPSReach:: Invalid Checksum");
           continue;
         }
 
         processGPSMessage(_msg_id);
-        ROS_WARN_STREAM("GPSReach:: Successfully parsed message of type: " << (int) _msg_id); 
+        ROS_DEBUG_STREAM("GPSReach:: Successfully parsed message of type: " << (int) _msg_id); 
         continue;
       }
     }
@@ -288,8 +288,8 @@ void GPSReach::processGPSTime(uint32_t millisecs, uint16_t week)
   m_gpsTime += week * SECONDS_IN_WEEK
   m_gpsTime += millisecs / 1000;
 
-  ROS_WARN_STREAM("GPS Time Raw: " << millisecs << " week: " << week);
-  ROS_WARN_STREAM("GPS Time " << asctime(gmtime(&m_gpsTime)));
+  ROS_DEBUG_STREAM("GPS Time Raw: " << millisecs << " week: " << week);
+  ROS_DEBUG_STREAM("GPS Time " << asctime(gmtime(&m_gpsTime)));
 }
 
 void GPSReach::processGPSMessage(int msgId)
@@ -298,16 +298,16 @@ void GPSReach::processGPSMessage(int msgId)
   {
     case MSG_VER:
       //erb_ver ver = (erb_ver) buffer;
-      ROS_WARN_STREAM("ERB Version: Time: " << _buffer.ver.time << " Ver: " <<  (int) _buffer.ver.ver_high << ":" << (int) _buffer.ver.ver_medium << ":" << (int)_buffer.ver.ver_low);
+      ROS_DEBUG_STREAM("ERB Version: Time: " << _buffer.ver.time << " Ver: " <<  (int) _buffer.ver.ver_high << ":" << (int) _buffer.ver.ver_medium << ":" << (int)_buffer.ver.ver_low);
       break;
     case MSG_DOPS:
-      ROS_WARN_STREAM("DOPS: " << (int) _buffer.dops.hDOP);
+      ROS_DEBUG_STREAM("DOPS: " << (int) _buffer.dops.hDOP);
       break;
     case MSG_STAT:
-      ROS_WARN_STREAM("GPS Status: Fix Type: " << (int) _buffer.stat.fix_type << "Fix Status: " << (int) _buffer.stat.fix_status << " Sats: " << (int) _buffer.stat.satellites << " Time: " << _buffer.stat.time << " Week: " << _buffer.stat.week);
+      ROS_DEBUG_STREAM("GPS Status: Fix Type: " << (int) _buffer.stat.fix_type << "Fix Status: " << (int) _buffer.stat.fix_status << " Sats: " << (int) _buffer.stat.satellites << " Time: " << _buffer.stat.time << " Week: " << _buffer.stat.week);
       break;
     case MSG_POS:
-      ROS_WARN_STREAM("GPS Pos: Long: " << _buffer.pos.longitude << " Lat: " << _buffer.pos.latitude << " Alt: " << _buffer.pos.altitude_msl);
+      ROS_DEBUG_STREAM("GPS Pos: Long: " << _buffer.pos.longitude << " Lat: " << _buffer.pos.latitude << " Alt: " << _buffer.pos.altitude_msl);
       break;
 
   }
@@ -349,7 +349,7 @@ void GPSReach::processGPSMessage(int msgId)
   }
   else if (msgId == MSG_RTK)
   {
-    ROS_WARN("Process RTK");
+    ROS_DEBUG_STREAM("Process RTK");
     publishRTCMData();
   }
 }
@@ -370,19 +370,19 @@ void GPSReach::publishRTCMData()
       */
   unsigned int len = sizeof(_buffer);
   
-  ROS_WARN_STREAM("RTCM len " << len);
+  ROS_DEBUG_STREAM("RTCM len " << len);
   try
   {                   
     //fill in structure to send message
-    ROS_WARN_STREAM("RTCM struct");
+    ROS_DEBUG_STREAM("RTCM struct");
     m_rtkCorrection.layout.dim.front().label = "RTCM3.0";      
     m_rtkCorrection.layout.dim.front().size = len;
     m_rtkCorrection.layout.dim.front().stride = 1*(len);
     m_rtkCorrection.data.resize(len);
-    ROS_WARN_STREAM("RTCM buffer copy start");
+    ROS_DEBUG_STREAM("RTCM buffer copy start");
     memcpy(&m_rtkCorrection.data[0], &_buffer, len);
 
-    ROS_WARN_STREAM("RTCM buffer copy complete");
+    ROS_DEBUG_STREAM("RTCM buffer copy complete");
     m_rtcm3Pub.publish(m_rtkCorrection);
   } catch(const boost::bad_lexical_cast &)
   {
@@ -394,7 +394,7 @@ void GPSReach::publishRTCMData()
 
 void GPSReach::rtcmCorrectionCallback(const std_msgs::ByteMultiArray& msg)
 {
-  ROS_WARN("write RTCM3 correction data");
+  ROS_DEBUG_STREAM("write RTCM3 correction data");
   m_portA.lock();
   m_portA.tick("Incoming Correction Data");
   m_mostRecentRTK = ros::Time::now();

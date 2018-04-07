@@ -33,7 +33,13 @@ export AR_CONFIG_PATH=`rospack find autorally_util`/config
 # Setup servo controller and determine chassis
 if [[ $devList == *"arChassis"* ]] # If Arduino Due is connected...
     then
-        AR_CHASSIS_SERIAL=`udevadm info --query=property --name=/dev/arChassis | grep 'ID_SERIAL_SHORT'`
+        if [[ $MASTER_HOSTNAME == "localhost" ]]
+            then
+                AR_CHASSIS_SERIAL=`udevadm info --query=property --name=/dev/arChassis | grep 'ID_SERIAL_SHORT'`
+        else
+                AR_CHASSIS_SERIAL=`ssh $MASTER_HOSTNAME udevadm info --query=property --name=/dev/arChassis | grep 'ID_SERIAL_SHORT'`                
+        fi
+        
         AR_CHASSIS_SERIAL=${AR_CHASSIS_SERIAL#*=}
         if [ $AR_CHASSIS_SERIAL == '8553130343135141D050' ]
           then

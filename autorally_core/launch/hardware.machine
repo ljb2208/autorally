@@ -11,5 +11,5 @@
     <machine name="autorally-master" address="$(env MASTER_HOSTNAME)" default="true"/>
   </group>
 
-  <machine name="autorally-ocs" address="$(env HOSTNAME)" />
+  <machine name="autorally-ocs" address="$(env HOSTNAME)" user="lbarnett" />
 </launch>
