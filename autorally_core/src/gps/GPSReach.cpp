@@ -198,7 +198,7 @@ void GPSReach::gpsInfoCallback()
   {
     size_t len = m_portA.m_data.length();
 
-    ROS_WARN_STREAM("GPSReach:: data length " << len);
+    ROS_DEBUG_STREAM("GPSReach:: data length " << len);
 
     for (uint i=0; i < len; i++)
     {
