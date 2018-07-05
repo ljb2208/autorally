@@ -3,7 +3,7 @@
 
   <node pkg="nodelet" type="nodelet" name="CameraTrigger" args="load autorally_core/CameraTrigger camera_nodelet_manager" output="screen" machine="autorally-master" >
 
-    <param name="port" value="/dev/arComputeBoxArduino" />
+    <param name="port" value="/dev/arArduino" />
     
     <!--configure settings for 115200 baud, 8N1 -->
     <param name="serialBaud" value="115200" />

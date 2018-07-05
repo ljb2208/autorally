@@ -80,7 +80,8 @@ void configureTriggerTimers()
   cli(); //disable global interrupts
   TCCR3A=0; //shut off timers
   TCCR3B = 0; //shut off timers
-  int cnt = (int)(1.0/((2.0*triggerFPS)*0.000016) - 1.0); //compute new overflow value. 2FPS to turn bit on and off at twice the framerate
+  //int cnt = (int)(1.0/((2.0*triggerFPS)*0.000016) - 1.0); //compute new overflow value. 2FPS to turn bit on and off at twice the framerate
+  int cnt = (int)(1.0/((4.0*triggerFPS)*0.000016) - 1.0); //compute new overflow value. 2FPS to turn bit on and off at twice the framerate
   OCR3A = cnt;  //set the compare register to this computed overflow value
   TCCR3B|=(1<<WGM32); //set timer to compare function (isntead of default overflow)
   TCCR3B |= (1<<CS32); //set prescaler to 1/256 
