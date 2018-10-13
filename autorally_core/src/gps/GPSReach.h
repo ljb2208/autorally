@@ -319,7 +319,7 @@ class GPSReach
                         const std::string& geodSep, const std::string &geodSepUnits);
 
   void processGPSTime(uint32_t millisecs, uint16_t week);
-  void processUTC(const std::string& utc, const std::string& source);
+
   double GetUTC(const std::string& utc);
 };
 #endif //GPS_REACH_H_
