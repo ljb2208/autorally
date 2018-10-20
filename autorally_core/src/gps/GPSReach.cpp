@@ -357,6 +357,12 @@ void GPSReach::processGPSMessage(int msgId)
   else if (msgId == MSG_RTK)
   {
     ROS_DEBUG_STREAM("Process RTK");
+
+    ROS_DEBUG_STREAM("RTK Num Sats      : " << (int) _buffer.rtk.base_num_sats);
+    ROS_DEBUG_STREAM("RTK Accuracy      : " << (int) _buffer.rtk.ar_ratio);
+    ROS_DEBUG_STREAM("RTK Age           : " << (int) _buffer.rtk.age_cs * 10);
+    ROS_DEBUG_STREAM("RTK Week No       : " << (int) _buffer.rtk.base_week_number);
+    ROS_DEBUG_STREAM("RTK Time Week (ms): " << (int) _buffer.rtk.base_time_week_ms);
     //publishRTCMData();
   }
 }
