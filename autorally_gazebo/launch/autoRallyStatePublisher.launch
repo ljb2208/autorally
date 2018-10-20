@@ -1,0 +1,14 @@
+<launch>
+ <!--   <param name="robot_description" textfile="$(find autorally_description)/urdf/autoRallyPlatform.urdf.xacro"/>
+
+   <node pkg="robot_state_publisher_urdf" type="robot_state_publisher_urdf" name="robot_state_pub">
+        <param name="publish_freq" type="int" value="20" />
+   </node>
+-->
+<param name="robot_description" command="$(find xacro)/xacro $(find autorally_description)/urdf/autoRallyPlatform.urdf.xacro prefix:=/"/>
+
+  <node name="autoRally_state_publisher" pkg="robot_state_publisher"
+        type="robot_state_publisher">
+    <param name="publish_frequency" value="50.0"/>
+  </node>
+</launch>
