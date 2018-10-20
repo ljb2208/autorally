@@ -1,9 +1,7 @@
 <launch>
   <include file="$(find autorally_core)/launch/hardware.machine" />
   <arg name="side" default="right" />
-  <arg name="serial" default="0" />
-
-
+  <arg name="serial" default="0" />0
 
   <node pkg="nodelet" type="nodelet" name="$(arg side)_CameraAutoBalance" args="load autorally_core/CameraAutoBalance camera_nodelet_manager" output="screen" machine="autorally-master" >
   <param name="roi_x_top_left" value="0" type="int" />

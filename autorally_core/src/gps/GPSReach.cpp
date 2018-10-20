@@ -113,7 +113,7 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
        * is connected, an exception occurs and the node crashes.
        */
       m_portA.init(nh, nodeName, "primaryPort", "Reach", portPathA, true);
-      //m_portB.init(nh, nodeName, "correctionPort", "Reach", portPathB, true);
+      m_portB.init(nh, nodeName, "correctionPort", "Reach", portPathB, true);
       
       m_rtcm3Pub = nh.advertise<std_msgs::ByteMultiArray>("gpsBaseRTCM3", 5);
       m_statusPub = nh.advertise<sensor_msgs::NavSatFix>("gpsBaseStatus", 5);
@@ -124,8 +124,8 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
                                         this);
       m_portA.registerDataCallback(
                       boost::bind(&GPSReach::gpsInfoCallback, this));
-      //m_portB.registerDataCallback(
-      //                boost::bind(&GPSReach::publishRTCMData, this));
+      m_portB.registerDataCallback(
+                      boost::bind(&GPSReach::publishRTCMData, this));
       
       //  m_refLocTimer = nh.createTimer(ros::Duration(60.0),
 //                    &GPSHemisphere::updateReferenceLocationCallback,
@@ -157,9 +157,14 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
     }
   }
 
-  if(!m_portA.connected()/* || !m_portB.connected()*/)
+  if(!m_portA.connected() /*|| !m_portB.connected()*/)
   {
-    ROS_ERROR("GPSReach: one of the serial ports isn't open, stuff might not work");
+    ROS_ERROR("GPSReach: the primary serial port isn't open, stuff might not work");
+  }
+
+  if (m_bIsBase && !m_portB.connected())
+  {
+    ROS_ERROR("GPSReach: the correction port is not open, correction data will not be available.");
   }
 
   m_navSatFix.status.status = sensor_msgs::NavSatStatus::STATUS_NO_FIX;
@@ -352,14 +357,33 @@ void GPSReach::processGPSMessage(int msgId)
   else if (msgId == MSG_RTK)
   {
     ROS_DEBUG_STREAM("Process RTK");
-    publishRTCMData();
+    //publishRTCMData();
   }
 }
 
 void GPSReach::publishRTCMData()
 {  
-  if(!m_bIsBase)
-    return;
+  m_portB.lock();
+
+  if(m_portB.m_data.size() > 6)
+  {
+    //make sure data is framed
+    if((m_portB.m_data[0]&0xff) != 0xd3)
+    {
+      std::string s;
+      s.push_back(0xd3);
+      s.push_back(0x00);
+      size_t start = m_portB.m_data.find(s);
+      //ROS_WARN_STREAM("Not Framed");
+      //std::cout << "Discarding:" << m_portB.m_data.substr(0, start).size() <<
+      //  " Leading with:" << (unsigned int)(m_portB.m_data[0]&0xff) << std::endl;
+      //printMessage(m_portB.m_data);
+      m_portB.m_data.erase(0, start);
+    }
+
+    //process if there is enough data to read the header and message type
+    if(m_portB.m_data.length() > 6)
+    {
       /*RTCM 3.0 frame structure:
                   bits 0 - 7 - header
                   bits 8 - 13 - reserved
@@ -370,28 +394,57 @@ void GPSReach::publishRTCMData()
                   first 6 bits of message body are message type,
                   total frame size (bytes): message length + 6
       */
-  unsigned int len = sizeof(_buffer);
-  
-  ROS_DEBUG_STREAM("RTCM len " << len);
-  try
-  {                   
-    //fill in structure to send message
-    ROS_DEBUG_STREAM("RTCM struct");
-    m_rtkCorrection.layout.dim.front().label = "RTCM3.0";      
-    m_rtkCorrection.layout.dim.front().size = len;
-    m_rtkCorrection.layout.dim.front().stride = 1*(len);
-    m_rtkCorrection.data.resize(len);
-    ROS_DEBUG_STREAM("RTCM buffer copy start");
-    memcpy(&m_rtkCorrection.data[0], &_buffer, len);
+      unsigned int len = (unsigned int)((((unsigned int)m_portB.m_data[1])&0x03)>>8) +
+                         (unsigned int)(((m_portB.m_data[2])&0xff)) + 6;
+      unsigned int type = (unsigned int)(((m_portB.m_data[3])&0xff)<<4) +
+                          (unsigned int)(((m_portB.m_data[4])&0xf0)>>4);
 
-    ROS_DEBUG_STREAM("RTCM buffer copy complete");
-    m_rtcm3Pub.publish(m_rtkCorrection);
-  } catch(const boost::bad_lexical_cast &)
-  {
-    ROS_ERROR_STREAM("GPSReach failed RTCM3.0 type lexical cast:");
-    m_portA.diag_warn("GPSReach failed RTCM3.0 type lexical cast");
-    return;
-  }                  
+      /*printf("%x %x %x %x %x\n", m_portB.m_data[0]&0xff,
+                                 m_portB.m_data[1]&0xff,
+                                 m_portB.m_data[2]&0xff,
+                                 m_portB.m_data[3]&0xff,
+                                 m_portB.m_data[4]&0xff);*/
+
+      if(m_portB.m_data.size() >= len && ((type > 1000 && type < 1030) || (type > 4087 && type <= 4096)))
+      {
+        //printMessage(m_portB.m_data);
+        //ROS_WARN_STREAM("Buffer len:" << m_portB.m_data.length() <<
+        //                " Payload len:" << len << " msg type:" << type);
+        //record type of message seen in diagnostics
+        try
+        {
+          m_portB.tick("RTCM3.0 type "+boost::lexical_cast<std::string>(type));
+         
+          //fill in structure to send message
+          m_rtkCorrection.layout.dim.front().label = "RTCM3.0 " +
+                          boost::lexical_cast<std::string>(type);
+      
+          m_rtkCorrection.layout.dim.front().size = len;
+          m_rtkCorrection.layout.dim.front().stride = 1*(len);
+          m_rtkCorrection.data.resize(len);
+          memcpy(&m_rtkCorrection.data[0], &m_portB.m_data[0], len);
+
+          m_rtcm3Pub.publish(m_rtkCorrection);
+        } catch(const boost::bad_lexical_cast &)
+        {
+          ROS_ERROR_STREAM("GPSReach failed RTCM3.0 type lexical cast:" << type);
+          m_portB.diag_warn("GPSReach failed RTCM3.0 type lexical cast");
+          return;
+        }
+        
+        m_portB.m_data.erase(0,len);
+        //std::cout << "\t new B Len:" << m_portB.m_data.length() << std::endl;
+      } else if(m_portB.m_data.size() >= len)
+      {
+        m_portB.m_data.erase(0,len);
+        ROS_WARN_STREAM("GPSReach:: unknown RTCM3.0 message type:" << type << " of length:" << len);
+        m_portB.diag_warn("GPSReach:: unknown " + m_rtkCorrection.layout.dim.front().label);
+      }
+
+    }
+  }
+
+  m_portB.unlock();
 }
 
 void GPSReach::rtcmCorrectionCallback(const std_msgs::ByteMultiArray& msg)

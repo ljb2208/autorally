@@ -22,6 +22,14 @@
     <param name="primaryPort/serialStopBits" value="1" />
     <param name="primaryPort/serialHardwareFlow" value="false" />
     <param name="primaryPort/serialSoftwareFlow" value="false" />
+
+    <param name="correctionPort/portPath" value="/dev/arGPSbasePortB" />
+    <param name="correctionPort/serialBaud" value="115200" />
+    <param name="correctionPort/serialDataBits" value="8" />
+    <param name="correctionPort/serialParity" value="none" />
+    <param name="correctionPort/serialStopBits" value="1" />
+    <param name="correctionPort/serialHardwareFlow" value="false" />
+    <param name="correctionPort/serialSoftwareFlow" value="false" />
   </node>
 
 </launch>
