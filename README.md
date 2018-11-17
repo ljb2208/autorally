@@ -44,16 +44,6 @@ Please submit pull requests to the [kinetic-devel branch](https://github.com/Aut
    * synaptic
    * python-termcolor
 
-3. __Install MPPI Dependencies (only if you have a GPU and will run MPPI)__
-
-    The core idea behind MPPI is to sample thousands of trajectories really fast. This is accomplished by implementing the sampling step on a GPU, for which you will need CUDA. We also use an external library to load python's numpy zip archives (.npz files) into C++.
-
-    * [Install CUDA](https://developer.nvidia.com/cuda-downloads)
-    * [Install CNPY](https://github.com/rogersce/cnpy)
-   
-<<<<<<< HEAD
-4. __[Install](http://www.ros.org/install/) ros-indigo-desktop-full__
-=======
    ```sudo apt-get install cutecom cmake-curses-gui synaptic python-termcolor```
 
 3. __[Install](http://www.ros.org/install/) ros-kinetic-desktop-full__
@@ -65,7 +55,6 @@ Please submit pull requests to the [kinetic-devel branch](https://github.com/Aut
     * [Install CUDA](https://developer.nvidia.com/cuda-downloads)
     * [Install CNPY](https://github.com/rogersce/cnpy)
 
->>>>>>> upstream/kinetic-devel
 5. __Install gtsam__
 
 
@@ -86,10 +75,6 @@ Get the autorally repository in a [catkin workspace](http://wiki.ros.org/catkin/
 Also clone the IMU code into the same catkin workspace:
 
     git clone https://github.com/AutoRally/imu_3dm_gx4.git
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/kinetic-devel
 
 ### 3. Install AutoRally ROS Dependencies
 
@@ -162,6 +147,6 @@ More detailed explanations of the controllers and state estimator can be found o
 
 [Controlling the AutoRally platform](https://github.com/AutoRally/autorally/wiki/Controlling%20the%20AutoRally%20Platform) is a tutorial for how your own controller can control the AutoRally platform (in simulation or on hardware).
 
-[Multiple AutoRally Platforms In Simulation](https://github.com/AutoRally/autorally/wiki/Running-Multiple-Vehicles-In-Simulation-(Gazebo)) is a tutorial on how to launch and control 2 or more platforms in simulation.
+[Running Vehicles in Simulation](https://github.com/AutoRally/autorally/wiki/AutoRally-Gazebo-Simulation) is a tutorial on how run gazebo in the two different worlds and with multiple vehicles.
 
 If you are configuring a physical AutoRally platform, the next step is to configure the compute box, all of the peripherals, and the launch system. Those instructions are found in the [Platform Configuration Instructions](https://github.com/AutoRally/autorally/wiki/Platform%20Configuration%20Instructions).
