@@ -25,7 +25,7 @@ Arguments:
   <arg name="sim" default="false"/>
   <arg name="InvertY" default="true"/>
   <arg name="InvertZ" default="true"/>
-  <arg name="FixedInitialPose" default="false"/>
+  <arg name="FixedInitialPose" default="true"/>
 
   <param name="/gps_imu/FixedInitialPose" value="$(arg sim)"/>
 

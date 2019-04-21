@@ -159,9 +159,14 @@ class AutoRallyCtrlr(object):
        self._right_rear_inv_circ) = \
        self._get_rear_wheel_params("right")
 
+      rospy.loginfo('Create Service Proxy')
+
       list_ctrlrs = rospy.ServiceProxy(namespace + '/list_controllers',
                                        ListControllers)
+
+      rospy.loginfo('Wait for service. Namespace: ' + namespace)
       list_ctrlrs.wait_for_service()
+      rospy.loginfo('Wait for service complete')
 
       # Shock absorbers
       shock_param_list = rospy.get_param("~shock_absorbers", [])
