@@ -117,3 +117,26 @@ if [[ $DEBUG == true ]]; then
     echo "AR_LEFTCAM_CONNECTED  = ${AR_LEFTCAM_CONNECTED}"
 fi
 
+for device in /dev/input/js*; do
+    AR_JOYSTICK=$(udevadm info -n $device -q property --export | grep ID_INPUT_JOYSTICK)
+    AR_JOYSTICK=${AR_JOYSTICK#*=}
+    if [[ $AR_JOYSTICK == "'1'" ]]; then
+        export AR_JOYSTICK="$device"
+        break
+    fi
+    export AR_JOYSTICK=
+done
+
+YELLOW=`tput setaf 3`
+RESET=`tput sgr0`
+if [[ -z $AR_JOYSTICK ]]; then
+    echo "${YELLOW}[WARNING] No joystick detected.${RESET}"
+fi
+
+if [[ $MASTER_HOSTNAME == "localhost" ]]
+    then
+        export AR_MPPI_PARAMS_PATH=`rospack find autorally_control`/src/path_integral/params/
+    else
+        export AR_MPPI_PARAMS_PATH=`ssh $user@$MASTER_HOSTNAME rospack find autorally_control`/src/path_integral/params/
+fi
+

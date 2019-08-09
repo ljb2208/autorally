@@ -49,16 +49,18 @@
 #include <QtGui/QTableWidgetItem>
 #include <QtGui/QPixmap>
 
-#include <ros/ros.h>
-#include <ros/time.h>
-#include <image_transport/image_transport.h>
-#include <diagnostic_msgs/DiagnosticArray.h>
-#include <autorally_msgs/chassisState.h>
- #include <autorally_msgs/chassisCommand.h>
-#include <autorally_msgs/wheelSpeeds.h>
-#include <autorally_msgs/runstop.h>
-#include "ImageMaskEntry.hpp"
-#include "DiagnosticsEntry.hpp"
+#ifndef Q_MOC_RUN
+  #include <ros/ros.h>
+  #include <ros/time.h>
+  #include <image_transport/image_transport.h>
+  #include <diagnostic_msgs/DiagnosticArray.h>
+  #include <autorally_msgs/chassisState.h>
+  #include <autorally_msgs/chassisCommand.h>
+  #include <autorally_msgs/wheelSpeeds.h>
+  #include <autorally_msgs/runstop.h>
+  #include "ImageMaskEntry.hpp"
+  #include "DiagnosticsEntry.hpp"
+#endif
 
 /**
  *  @class QNode qnode.hpp "ocs/qnode.hpp"
@@ -80,8 +82,12 @@ public:
   QPixmap m_firewireImage2;
 
   DiagnosticsEntry m_diagModel;
+  pthread_mutex_t m_diagMutex;	
+  
   ImageMaskEntry m_imMaskModel;
   pthread_mutex_t m_imageMutex;
+
+  pthread_mutex_t m_runstopMutex;
 
   /**
   * @brief Constructor, just initializes internal variables
@@ -207,15 +213,31 @@ signals:
 public slots:
 
   /**
-  * @brief Update the time since last message received for all elements in OCS
+  * @brief Update the time since last message received for the runstop display in OCS
   */
-  void updateTimes();
+  void updateRunstopTimes();
+
+  /**
+  * @brief Update the time since last message received for all elements diagnostics display in OCS
+  */
+  void updateDiagTimes();
 
   /**
   * @brief Callback for a user click on a runstop entry
   * @param index the index for the item clicked
   */
   void runstopModelDoubleClicked(const QModelIndex& index);
+
+  /**
+  * @brief Callback for a user click on a runstop entry
+  * @param index the index for the item clicked
+  */
+  void diagModelDoubleClicked(const QModelIndex& index);
+
+  /**
+  * @brief Remove all stale diagnostic messages
+  */
+  void clearStaleDiag();
 
 private:
 	int init_argc; ///< Command line parameter count

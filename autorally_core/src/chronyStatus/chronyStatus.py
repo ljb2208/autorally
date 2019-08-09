@@ -85,6 +85,7 @@ def getSources(status):
     sourcesText = check_output("chronyc sources", shell=True);
     lines = sourcesText.split('\n')
     status.level = 1
+    status.message = "Not Synchronized"
     for line in lines[3:]:
       if len(line):
         tok = line.split()
@@ -96,6 +97,7 @@ def getSources(status):
         #all is good if we are synchronizing to a source
         if tok[0][1] == '*':
           status.level = 0
+          status.message = "Synchronized to " + tok[1]
         #print M, S
     
   except subprocess.CalledProcessError as e:
@@ -108,7 +110,7 @@ if __name__ == '__main__':
   rospy.init_node('chronyStatus_'+hostname)
   pub = rospy.Publisher('/diagnostics', DiagnosticArray, queue_size=1, latch=True)
   array = DiagnosticArray()
-  status = DiagnosticStatus(name='ChronyStatus',\
+  status = DiagnosticStatus(name='chronyStatus',\
                             level=0,\
                             hardware_id=hostname)
 
