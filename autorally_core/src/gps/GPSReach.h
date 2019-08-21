@@ -139,6 +139,7 @@ class GPSReach
   bool m_bIsBase;
 
   SerialInterfaceThreaded m_portA; ///<Serial port for status updates and position correction updates
+  SerialInterfaceThreaded m_portB; ///<Serial port for status updates and position correction updates
 
   ros::Time m_previousCovTime;
   double m_accuracyRTK;

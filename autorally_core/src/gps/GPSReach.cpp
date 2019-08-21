@@ -113,7 +113,7 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
        * is connected, an exception occurs and the node crashes.
        */
       m_portA.init(nh, nodeName, "primaryPort", "Reach", portPathA, true);
-      //m_portB.init(nh, nodeName, "correctionPort", "Reach", portPathB, true);
+      m_portB.init(nh, nodeName, "correctionPort", "Reach", portPathB, true);
       
       m_rtcm3Pub = nh.advertise<std_msgs::ByteMultiArray>("gpsBaseRTCM3", 5);
       m_statusPub = nh.advertise<sensor_msgs::NavSatFix>("gpsBaseStatus", 5);
@@ -124,8 +124,8 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
                                         this);
       m_portA.registerDataCallback(
                       boost::bind(&GPSReach::gpsInfoCallback, this));
-      //m_portB.registerDataCallback(
-      //                boost::bind(&GPSReach::publishRTCMData, this));
+      m_portB.registerDataCallback(
+                      boost::bind(&GPSReach::publishRTCMData, this));
       
       //  m_refLocTimer = nh.createTimer(ros::Duration(60.0),
 //                    &GPSHemisphere::updateReferenceLocationCallback,
@@ -142,7 +142,7 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
        * if a message is received from serial before the associated publisher
        * is connected, an exception occurs and the node crashes.
        */
-      m_portA.init(nh, nodeName, "primaryPort", "Reach", portPathA, true);      
+      m_portA.init(nh, nodeName, "primaryPort", "Reach", portPathA, true);          
       
       m_statusPub = nh.advertise<sensor_msgs::NavSatFix>("gpsRoverStatus", 5);
 
@@ -157,9 +157,14 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
     }
   }
 
-  if(!m_portA.connected()/* || !m_portB.connected()*/)
+  if(!m_portA.connected())
   {
-    ROS_ERROR("GPSReach: one of the serial ports isn't open, stuff might not work");
+    ROS_ERROR("GPSReach: primary serial port is not open");
+  }
+
+  if(!m_portB.connected())
+  {
+    ROS_ERROR("GPSReach: primary serial port is not open");
   }
 
   m_navSatFix.status.status = sensor_msgs::NavSatStatus::STATUS_NO_FIX;
@@ -288,6 +293,13 @@ void GPSReach::processGPSTime(uint32_t millisecs, uint16_t week)
   m_gpsTime += week * SECONDS_IN_WEEK
   m_gpsTime += millisecs / 1000;
 
+  if (m_bIsBase)
+  {
+      m_timeUTC.header.stamp = ros::Time::now();
+      m_timeUTC.time_ref = ros::Time(m_gpsTime);
+      m_utcPub.publish(m_timeUTC);
+  }
+
   ROS_WARN_STREAM("GPS Time Raw: " << millisecs << " week: " << week);
   ROS_WARN_STREAM("GPS Time " << asctime(gmtime(&m_gpsTime)));
 }
@@ -349,47 +361,61 @@ void GPSReach::processGPSMessage(int msgId)
   }
   else if (msgId == MSG_RTK)
   {
-    ROS_WARN("Process RTK");
-    publishRTCMData();
+    // ROS_WARN("Process RTK");
+    // publishRTCMData();
   }
 }
 
 void GPSReach::publishRTCMData()
-{  
-  if(!m_bIsBase)
-    return;
-      /*RTCM 3.0 frame structure:
-                  bits 0 - 7 - header
-                  bits 8 - 13 - reserved
-                  bits 14 - 23 - message length
-                  bits 24 - 23+length - message
-                  bits 24+length - 24+length+23 - 24 bit bit CRC
+{
+  /*RTCM 3.0 frame structure:
+              bits 0 - 7 - header
+              bits 8 - 13 - reserved
+              bits 14 - 23 - message length
+              bits 24 - 23+length - message
+              bits 24+length - 24+length+23 - 24 bit bit CRC
 
-                  first 6 bits of message body are message type,
-                  total frame size (bytes): message length + 6
-      */
-  unsigned int len = sizeof(_buffer);
-  
-  ROS_WARN_STREAM("RTCM len " << len);
-  try
-  {                   
-    //fill in structure to send message
-    ROS_WARN_STREAM("RTCM struct");
-    m_rtkCorrection.layout.dim.front().label = "RTCM3.0";      
-    m_rtkCorrection.layout.dim.front().size = len;
-    m_rtkCorrection.layout.dim.front().stride = 1*(len);
-    m_rtkCorrection.data.resize(len);
-    ROS_WARN_STREAM("RTCM buffer copy start");
-    memcpy(&m_rtkCorrection.data[0], &_buffer, len);
+              first 6 bits of message body are message type,
+              total frame size (bytes): message length + 6
+  */
+   
+  m_portB.lock();
 
-    ROS_WARN_STREAM("RTCM buffer copy complete");
-    m_rtcm3Pub.publish(m_rtkCorrection);
-  } catch(const boost::bad_lexical_cast &)
+  if(m_portB.m_data.size() > 6)
   {
-    ROS_ERROR_STREAM("GPSReach failed RTCM3.0 type lexical cast:");
-    m_portA.diag_warn("GPSReach failed RTCM3.0 type lexical cast");
-    return;
-  }                  
+      std::string s;
+      s.push_back(0xd3);
+      s.push_back(0x00);
+      size_t start = m_portB.m_data.find(s);
+      size_t end = m_portB.m_data.find(s, start + 1);
+
+      while (start != std::string::npos && end != std::string::npos)
+      {
+          unsigned int type = (unsigned int)(((m_portB.m_data[start + 3])&0xff)<<4) +
+                          (unsigned int)(((m_portB.m_data[start + 4])&0xf0)>>4);
+          int len = end - start;
+          m_portB.tick("RTCM3.0 type "+boost::lexical_cast<std::string>(type));
+         
+          //fill in structure to send message
+          m_rtkCorrection.layout.dim.front().label = "RTCM3.0 " +
+                          boost::lexical_cast<std::string>(type);
+      
+          m_rtkCorrection.layout.dim.front().size = len;
+          m_rtkCorrection.layout.dim.front().stride = 1*(len);
+          m_rtkCorrection.data.resize(len);
+          memcpy(&m_rtkCorrection.data[0], &m_portB.m_data[start], len);
+
+          m_rtcm3Pub.publish(m_rtkCorrection);
+          ROS_DEBUG_STREAM("RTCM Data published. Len: " << (int) len);
+          m_portB.m_data.erase(0, end);
+
+          start = m_portA.m_data.find(s);
+          end = m_portA.m_data.find(s, start + 1);
+      }
+  }
+
+
+  m_portB.unlock();                  
 }
 
 void GPSReach::rtcmCorrectionCallback(const std_msgs::ByteMultiArray& msg)
