@@ -19,6 +19,8 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(cmake_modules REQUIRED)
 
+find_package(Boost 1.49.0 REQUIRED)
+
 find_package(catkin REQUIRED)
 
 catkin_python_setup()
@@ -29,7 +31,7 @@ generate_dynamic_reconfigure_options(
 )
 
 catkin_package(
-    DEPENDS
+    DEPENDS Boost
     CATKIN_DEPENDS roscpp rospy std_msgs geometry_msgs sensor_msgs nav_msgs image_transport autorally_msgs
     INCLUDE_DIRS include
     LIBRARIES SerialSensorInterface ar_diagnostics RingBuffer
