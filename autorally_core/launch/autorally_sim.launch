@@ -1,0 +1,24 @@
+<launch>
+
+  <arg name="mppi" default="false" />
+  <arg name="no_controller" default="false" />
+
+  <include file="$(find autorally_gazebo)/launch/autoRallyTrackGazeboSim.launch"/>
+  
+  <include file="$(find autorally_core)/launch/stateEstimator.launch">  
+    <arg name="sim" value="true" />
+    <arg name="InvertY" value="false" />
+    <arg name="InvertZ" value="false" />
+    <arg name="FixedInitialPose" value="true" />
+  </include>
+
+  <group unless="$(arg no_controller)">
+    <include file="$(find autorally_control)/launch/waypointFollower.launch"/>  
+    <group if="$(arg mppi)">
+      <include file="$(find autorally_control)/launch/path_integral_nn.launch"/>      
+    </group>
+    <group unless="$(arg mppi)">
+      <include file="$(find autorally_control)/launch/constantSpeedController.launch"/>
+    </group>
+  </group>
+</launch>
