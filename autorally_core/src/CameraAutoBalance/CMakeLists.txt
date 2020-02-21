@@ -43,3 +43,25 @@ if(Spinnaker_LIB)
 else()
   message(WARNING "Could not find Spinnaker library. Will not build CameraAutoBalance for FLIR cameras")
 endif()
+
+
+find_library(XIMEA_LIB m3api)
+if(XIMEA_LIB)
+  include_directories(/usr/include)
+  add_library(XimeaAdjuster XimeaAdjuster.cpp)
+  target_link_libraries(XimeaAdjuster ${XIMEA_LIB})
+
+  add_library(CameraAutoBalanceXIMEA CameraAutoBalanceXIMEA.cpp)
+  add_dependencies(CameraAutoBalanceXIMEA XimeaAdjuster)
+  target_link_libraries(CameraAutoBalanceXIMEA CameraAutoBalance XimeaAdjuster)
+
+  install(TARGETS
+    CameraAutoBalanceXIMEA
+    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+  )
+else()
+  message(WARNING "Could not find XIMEA library. Will not build CameraAutoBalance for XIMEA cameras")
+endif()
+
