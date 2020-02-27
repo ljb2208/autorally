@@ -6,6 +6,9 @@ ACTION=="add", SUBSYSTEM=="usb-serial", DRIVER=="ftdi_sio", ATTR{latency_timer}=
 SUBSYSTEM=="tty", ATTRS{serial}=="PORT_A_SERIAL", MODE="0666", SYMLINK+="arGPSBasePortA"
 SUBSYSTEM=="tty", ATTRS{serial}=="PORT_B_SERIAL", MODE="0666", SYMLINK+="arGPSBasePortB"
 
+# GPS Base Reach
+SUBSYSTEM=="tty", ATTRS{serial}=="e89f75de17d5458c86293aa3febcaf09", MODE="0666", SYMLINK+="arGPSBasePortA"
+
 # GPS Rovers
 # Replace "PORT_*_SERIAL" with the serial number for the USB-to-serial adapter for each port
 SUBSYSTEM=="tty", ATTRS{serial}=="PORT_A_SERIAL", MODE="0666", SYMLINK+="arGPSRoverPortA"

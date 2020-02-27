@@ -1,7 +1,7 @@
 <launch>
 
   <arg name="mppi" default="false" />
-  <arg name="no_controller" default="false" />
+  <arg name="no_controller" default="true" />
 
   <include file="$(find autorally_gazebo)/launch/autoRallyTrackGazeboSim.launch"/>
   

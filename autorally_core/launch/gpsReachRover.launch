@@ -13,7 +13,7 @@
     <param name="showGsv" value="false" />
     
     <!--configure settings for primary port -->
-    <param name="primaryPort/portPath" value="/dev/arGPSroverPortA" />
+    <param name="primaryPort/portPath" value="/dev/ttyACM1" />
     <param name="primaryPort/serialBaud" value="115200" />
     <param name="primaryPort/serialDataBits" value="8" />
     <param name="primaryPort/serialParity" value="none" />

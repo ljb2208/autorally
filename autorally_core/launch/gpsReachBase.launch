@@ -15,7 +15,7 @@
     <!-- <remap from="gpsBaseRTCM3" to="gpsBaseRTCM3Xbee" />  -->  
     
 
-    <param name="primaryPort/portPath" value="/dev/arGPSbasePortA" />
+    <param name="primaryPort/portPath" value="/dev/ttyACM0" />
     <param name="primaryPort/serialBaud" value="115200" />
     <param name="primaryPort/serialDataBits" value="8" />
     <param name="primaryPort/serialParity" value="none" />
@@ -23,7 +23,7 @@
     <param name="primaryPort/serialHardwareFlow" value="false" />
     <param name="primaryPort/serialSoftwareFlow" value="false" />
 
-    <param name="correctionPort/portPath" value="/dev/arGPSbasePortB" />
+    <param name="correctionPort/portPath" value="/dev/ttyUSB0" />
     <param name="correctionPort/serialBaud" value="115200" />
     <param name="correctionPort/serialDataBits" value="8" />
     <param name="correctionPort/serialParity" value="none" />
