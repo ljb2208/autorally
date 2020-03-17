@@ -35,9 +35,9 @@ if [[ $devList == *"arChassis"* ]] # If Arduino Due is connected...
     then
         AR_CHASSIS_SERIAL=`udevadm info --query=property --name=/dev/arChassis | grep 'ID_SERIAL_SHORT'`
         AR_CHASSIS_SERIAL=${AR_CHASSIS_SERIAL#*=}
-        if [ $AR_CHASSIS_SERIAL == 'ARDUINO_DUE_SERIAL_NUMBER' ]
+        if [ $AR_CHASSIS_SERIAL == '8553130343135141D050' ]
           then
-            export AR_CHASSIS="CHASSIS_NAME"
+            export AR_CHASSIS="Alpha"
         #elif [ $AR_CHASSIS_SERIAL == 'ARDUINO_DUE_SERIAL_NUMBER2' ]
         #  then
         #    export AR_CHASSIS="CHASSIS_NAME2"

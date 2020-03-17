@@ -136,6 +136,7 @@ class GPSReach
   sensor_msgs::TimeReference m_timeUTC; ///<Base station position information
   int m_secondsToToday; //used to find UTC time if needed  
   bool m_bIsBase;
+  bool m_bCorrections;
 
   SerialInterfaceThreaded m_portA; ///<Serial port for status updates and position correction updates
   SerialInterfaceThreaded m_portB; ///<Serial port for status updates and position correction updates

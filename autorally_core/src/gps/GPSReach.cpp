@@ -77,6 +77,16 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
   nh.param<double>(nodeName+"/gpsTimeOffset", m_gpsTimeOffset, 0.0);
   nh.param<std::string>(nodeName+"/utcSource", m_utcSource, "GPZDA");
   nh.param<bool>(nodeName+"/showGsv", m_showGsv, "false");
+  // nh.param<bool>(nodeName+"/corrections", m_corrections, "false");
+
+  m_bCorrections = false;
+  nh.getParam(nodeName+"/corrections", m_bCorrections);
+
+  if (m_bCorrections)
+    ROS_INFO("Corrections will be processed.");
+  else
+    ROS_INFO("Corrections will not be processed.");
+  
 
 
   if(!nh.getParam(nodeName+"/mode", mode) ||
@@ -88,22 +98,30 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
     if(mode == "base")
     {
       m_navSatFix.header.frame_id = "gpsBase";
-      m_bIsBase = true;
-
-      m_rtkCorrection.layout.data_offset = 0;
-      m_rtkCorrection.layout.dim.push_back(std_msgs::MultiArrayDimension());
-      m_timeUTC.source = "gps";
-
-      nh.getParam(nodeName+"/correctionPort/portPath", portPathB);
+      m_bIsBase = true;      
+      m_timeUTC.source = "gps";      
+      
 
       /* Have to init serial ports after publishers are connected otherwise
        * if a message is received from serial before the associated publisher
        * is connected, an exception occurs and the node crashes.
        */
       m_portA.init(nh, nodeName, "primaryPort", "Reach", portPathA, true);
-      m_portB.init(nh, nodeName, "correctionPort", "Reach", portPathB, true);
+
+      if (m_bCorrections)
+      {
+        m_rtkCorrection.layout.data_offset = 0;
+        m_rtkCorrection.layout.dim.push_back(std_msgs::MultiArrayDimension());
+
+        nh.getParam(nodeName+"/correctionPort/portPath", portPathB);
+        m_portB.init(nh, nodeName, "correctionPort", "Reach", portPathB, true);
+        m_rtcm3Pub = nh.advertise<std_msgs::ByteMultiArray>("gpsBaseRTCM3", 5);
+        
+        m_portB.registerDataCallback(
+                        boost::bind(&GPSReach::publishRTCMData, this));
+
+      }
       
-      m_rtcm3Pub = nh.advertise<std_msgs::ByteMultiArray>("gpsBaseRTCM3", 5);
       m_statusPub = nh.advertise<sensor_msgs::NavSatFix>("gpsBaseStatus", 5);
       m_utcPub = nh.advertise<sensor_msgs::TimeReference>("utc", 5);
 
@@ -111,9 +129,7 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
                                         &GPSReach::rtkStatusCallback,
                                         this);
       m_portA.registerDataCallback(
-                      boost::bind(&GPSReach::gpsInfoCallback, this));
-      m_portB.registerDataCallback(
-                      boost::bind(&GPSReach::publishRTCMData, this));
+                      boost::bind(&GPSReach::gpsInfoCallback, this));      
       
       //  m_refLocTimer = nh.createTimer(ros::Duration(60.0),
 //                    &GPSHemisphere::updateReferenceLocationCallback,
@@ -124,6 +140,7 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
        * is not needed
        */
       m_bIsBase = false;
+
       m_navSatFix.header.frame_id = "gpsRover";
 
       /* Have to init serial ports after publishers are connected otherwise
@@ -134,9 +151,10 @@ GPSReach::GPSReach(ros::NodeHandle &nh):
       
       m_statusPub = nh.advertise<sensor_msgs::NavSatFix>("gpsRoverStatus", 5);
 
-      m_rtcm3Sub = nh.subscribe("gpsBaseRTCM3", 5,
-                              &GPSReach::rtcmCorrectionCallback,
-                              this);
+      if (m_bCorrections)
+        m_rtcm3Sub = nh.subscribe("gpsBaseRTCM3", 5,
+                                &GPSReach::rtcmCorrectionCallback,
+                                this);
       m_portA.registerDataCallback(
                       boost::bind(&GPSReach::gpsInfoCallback, this));
     } else

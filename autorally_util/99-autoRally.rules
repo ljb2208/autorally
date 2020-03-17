@@ -9,6 +9,15 @@ SUBSYSTEM=="tty", ATTRS{serial}=="PORT_B_SERIAL", MODE="0666", SYMLINK+="arGPSBa
 # GPS Base Reach
 SUBSYSTEM=="tty", ATTRS{serial}=="e89f75de17d5458c86293aa3febcaf09", MODE="0666", SYMLINK+="arGPSBasePortA"
 
+# GPS Rover Reach
+SUBSYSTEM=="tty", ATTRS{idVendor}=="3032", ATTRS{idProduct}=="0014", MODE="0666", SYMLINK+="arGPSRoverPortA"
+
+# IMU
+SUBSYSTEM=="tty", ATTRS{idVendor}=="26ac", ATTRS{idProduct}=="0012", MODE="0666", SYMLINK+="arIMU"
+
+# XIMEA CAMERAS
+SUBSYSTEM=="tty", ATTRS{idVendor}=="20f7", ATTRS{idProduct}=="3001", MODE="0666", SYMLINK+="arLeftCamera"
+
 # GPS Rovers
 # Replace "PORT_*_SERIAL" with the serial number for the USB-to-serial adapter for each port
 SUBSYSTEM=="tty", ATTRS{serial}=="PORT_A_SERIAL", MODE="0666", SYMLINK+="arGPSRoverPortA"
